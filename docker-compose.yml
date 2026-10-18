@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dlp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dlp}
+      POSTGRES_DB: ${POSTGRES_DB:-dlp}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # No "ports:": the database is reachable only from inside the Docker network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dlp}:${POSTGRES_PASSWORD:-dlp}@db:5432/${POSTGRES_DB:-dlp}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
